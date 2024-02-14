@@ -1,0 +1,299 @@
+---
+author: "Leo XIONG"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, fig.height = 4)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(modelr)
+source("../../scripts/viridis.R")
+source("../../scripts/ggprob.R")
+```
+
+\renewcommand{\prob}{\mathsf{P}}
+\newcommand{\E}{\mathsf{E}}
+\newcommand{\Var}{\mathsf{Var}}
+\newcommand{\SD}{\mathsf{SD}}
+\newcommand{\SE}{\mathsf{SE}}
+
+## Homework Assignment 11
+
+#### Due Friday, April 28, 2022, at 11:59 PM
+
+### Preliminaries
+
+- Directories
+    - COURSE/homework/
+    - COURSE/homework/hw11/
+    - COURSE/data/
+    - COURSE/scripts/
+- Files
+  - COURSE/homework/hw11/hw11.Rmd
+  - COURSE/data/boston-marathon-data.csv
+  - COURSE/data/dugong.csv
+  - COURSE/scripts/viridis.R
+  - COURSE/scripts/ggprob.R
+
+### Data
+
+- Some problems use the official Madison weather data, `madison-weather-official-1869-2022.csv`.
+- Additional problems use the Boston Marathon data in the file `boston-marathon-data.csv`. This file is a transformed version of the raw data we used in class and has data for all runners who completed the race in 2010 and 2011. The variable `Time` is the sum of the times from the different portions of the race, each of which begins with "K".
+
+### Aims
+
+- Practice regression
+
+## Problems
+
+  **1.** In a regression problem to estimate $y$ from explanatory variable $x$ from a sample of size $n$, partial summary information is $\bar{x} = 20$ and $\bar{y} = 100$. Regardless of the values of other summary statistics, what is the value the predicted value $\hat{y}$ at a point where $x = 20$? Briefly explain.
+  
+```{r}
+yhat = ((20*20)+100)
+yhat
+```
+
+> yhat equation is B0 + B1X1, we're given 3 values. So muliplying and adding the equation, we get yhat equal to 500
+
+
+
+
+  **2.** In a regression problem to estimate $y$ from explanatory variable $x$ from a sample of size $n$, partial summary information is $\bar{x} = 20$, $s_x = 5$, $\bar{y} = 100$, and $s_y = 15$. Which of the following values are possible values for the predicted value $\hat{y}$ when the explanatory variable has value $x = 30$? Briefly explain.
+  
+```{r}
+xbar=20
+ybar = 100
+sy=15
+sx=5
+r = cor(c(xbar, sx), c(ybar, sy))
+b1 = r/(sy/sx)
+b0 = ybar - (b1-xbar)
+yhat2 = b0+b1*xbar
+yhat2
+```
+  
+**(a)** 50      
+**(b)** 70      
+**(c)** 100      
+**(d)** 120    
+**(e)** 150
+
+> Answer is D. With our given values, we can calulate what b0 and b1 is, and we are given what x is. we multiply these three values to ge 126.3333, which is closest to answer D, which is 120. 
+
+
+Problems 3--6 are based on the data set in the file *dugong.csv* which relates age (in years) and length (in meters) of a sample of 27 dugongs, a type of marine mammal.
+  
+Credit:  The *dugong.csv* file is from Data8 at UC-Berkeley.
+
+
+  **3.**
+
+- Read in the *dugong.csv* data set.  
+-  Create a scatter plot with `length` on the x-axis and `age` on the y-axis; be sure to add descriptive axis labels (include units of measurement) and a title.  
+-  Using `geom_smooth()`, add the least-squares line to your plot.
+
+```{r}
+dugong = read_csv("../../data/dugong.csv")
+```
+```{r}
+ggplot(dugong, aes(x = Length, y = Age))+
+  geom_point()+
+  geom_smooth(se = FALSE)+
+  xlab("Length")+
+  ylab("Age")+
+  ggtitle("Length vs Age")
+
+```
+
+
+
+
+  **4.**
+
+- Using the dugong data, calculate the sample means, sample standard deviations, and correlation coefficient of the variables `age` and `length`.
+- Using formulas from lecture, calculate the slope and intercept of the least squares regressions line to predict age with length.
+
+```{r}
+samplemeanage= mean(dugong$Age)
+samplemeanlength= mean(dugong$Length)
+samplesdage = sd(dugong$Age)
+samplesdlength= sd(dugong$Length)
+corr = cor(dugong$Length, dugong$Age)
+
+slope = corr*(samplesdage/samplesdlength)
+intercept = samplemeanage - slope*samplemeanlength
+slope
+intercept
+```
+
+- Use the dugong data and the functions `lm()` and `coef()` to calculate the slope and intercept of the least squares regression line of age against length (use length to predict age).
+
+```{r}
+df = tibble(x=dugong$Length, y = dugong$Age)
+lm = lm(y~x, df)
+summary(lm)
+coef(lm)
+```
+
+- Verify that you get the same values.
+
+
+
+
+
+
+  **5.**
+
+- Add columns with the predicted values and residuals to the dugong data set. *(You can use* **modelr** *functions or just use `mutate()` and calculate these values directly.)*
+- Plot the residuals versus length.
+    - Add a horizontal line at $y=0$ and appropriate labels on each axis.
+
+```{r}
+df2 = df %>% 
+  add_residuals(lm) %>% 
+  add_predictions(lm)
+
+ggplot(df2, aes(x =x ,y = resid ))+
+  geom_point()+
+  geom_hline(yintercept=0, linetype = "dashed", color = "blue")+
+  xlab("Length")+ylab("residuals")
+```
+
+- Describe what the residual plot suggests about the appropriateness of using simple linear regression to predict age from length of dugongs.
+
+> the residual plot appears to be quadratic, as it starts positve, goes negative, then positive again. This means that average longer dugongs tend to have a lower age, compared to longer dugongs and shorter dugongs.
+
+
+
+
+
+
+
+  **6.**
+
+- Print the summary of the fitted regression model
+
+```{r}
+summary(df2)
+summary(lm)
+```
+
+- The simple linear regression model for $Y_i$ conditional on the values of $X_i = x_i$ is
+
+$$
+\E(Y_i \mid X_i = x_i) = \beta_0 + \beta_1 x_i + \varepsilon_i, \quad \text{for $i = 1, \ldots,n$}
+$$
+
+where $\varepsilon_i \sim \text{Normal}(0, \sigma)$
+for some parameter $\sigma > 0$.
+
+- The parameter $\sigma$ is the unknown population standard deviation of the typical distance between a point $Y_i$ and its true expected value.
+
+- Use the function `sigma()` on the fitted regression object (what you created with `lm()`) to extract the estimate of $\sigma$. Identify where this numerical value appears in the printed summary you made earlier.
+
+```{r}
+sigma(lm)
+```
+
+- The numerical estimate of $\sigma$ here is not quite the standard deviation of the residuals because the denominator is $n-2$, the degrees of freedom in simple linear regression, instead of $n-1$, the degrees of freedom from a single numerical sample.
+
+- Use the column of residuals in the augments data set `dugong` and verify that:
+    - the mean of the residuals equals zero (numerically, it might be very close).
+    - you arrive at the numerical estimate of $\sigma$ by calculating
+    
+$$
+\sqrt{ \frac{\sum_{i=1}^n (y_i - \hat{y}_i)^2}{n-2} }
+$$
+
+where the $i$th residual is $y_i - \hat{y}_i$.
+
+```{r}
+meanresid = mean(df2$resid)
+n = nrow(df2)
+y= 23.77168*sigma(lm) -44.56683
+yhat = mean(df2$y)+cor(df2$x, df2$y)*(23.77168-mean(df2$x))/sd(df2$x)
+sigma = ((y-yhat)*(y-yhat))/(n-2)
+sqrt(sigma)
+```
+
+
+
+
+
+
+
+- Problems 7--8 use the cleaned Boston Marathon data in `boston-marathon-data.csv`.
+
+
+  **7.**
+
+- Read in the Boston marathon data fro the file `boston-marathon-data.csv`.
+
+```{r}
+marathon = read_csv("../../data/boston-marathon-data.csv")
+```
+
+- Create a scatter plots of `Time` versus `Age` for the female runners in 2010.
+    - Add a straight regression line
+    - Add a smooth curve
+- As there are so many points, you may set `alpha` to a value less than one inside of `geom_point()` to lessen the effects of overplotting.    
+    
+```{r}
+women = marathon %>% 
+  filter(Year == 2010,
+         Sex == "female")
+
+ggplot(women, aes(x = Age, y = Time))+
+  geom_point(alpha = 0.5)+
+  geom_smooth()
+```
+    
+- Make a residual plot of the residuals versus `Age`.
+    - Include a horizontal line at $y=0$
+    - Include a smooth curve through the residuals
+
+- In addition, make a density plot of the residuals.    
+```{r, include = FALSE}
+df3 = tibble(x = women$Time,
+             y = women$Age)
+lm2 = lm(y~x, df3)
+df4 = df3 %>% 
+  add_residuals(lm2) %>% 
+  add_predictions(lm2)
+```
+```{r}
+ggplot(df4, aes(x = y, y = resid))+
+  geom_point()+
+  geom_smooth()+
+  geom_hline(yintercept = 0, linetype = "dashed", color ="red")+
+  ggtitle("residuals vs age")
+
+ggplot(df4, aes(x = resid))+
+  geom_density()+
+  ggtitle("residual density plot")
+```
+
+
+
+
+
+
+
+  **8.** Examine the residual plots from the previous problem.
+  
+- Is there evidence of strong non-linearity?
+
+> There is no evidence proving non-linearity
+
+- Is there evidence that the standard deviation of the residuals varies substantially with changes in age?
+
+> No, There is no evidince showing variation of standard deviation with change in age
+
+
+- Is there evidence that the error distribution for individual residuals is not symmetric?
+
+> Yes, looking at the distribution graph we plotted, the shape is not symmetrical, proving this. The scatter plot too shows that it is not symmetrical. 
+
+

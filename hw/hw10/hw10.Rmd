@@ -1,0 +1,341 @@
+---
+author: "Leo XIONG"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE, error = TRUE, fig.height = 3)
+library(tidyverse)
+library(lubridate)
+library(kableExtra)
+library(broman)
+source("../../scripts/viridis.R")
+source("../../scripts/ggprob.R")
+theme_set(theme_minimal())
+```
+
+\newcommand{\E}{\mathsf{E}}
+\newcommand{\Var}{\mathsf{Var}}
+\newcommand{\SD}{\mathsf{SD}}
+\renewcommand{\prob}{\mathsf{P}}
+
+## Assignment 10
+
+#### Due Friday, April 21, 11:59 PM CT
+
+### Preliminaries
+
+- Directories
+    - COURSE/homework/
+    - COURSE/homework/hw10/
+    - COURSE/data/
+    - COURSE/scripts/
+- Files
+  - COURSE/homework/hw10/hw10.Rmd
+  - COURSE/data/boston-marathon-data.csv
+  - COURSE/data/madison-weather-official-1869-2022.csv
+  - COURSE/scripts/viridis.R
+  - COURSE/scripts/ggprob.R
+
+### Data
+
+- Some problems use the official Madison weather data, `madison-weather-official-1869-2022.csv`.
+- Additional problems use the Boston Marathon data in the file `boston-marathon-data.csv`. This file is a transformed version of the raw data we used in class and has data for all runners who completed the race in 2010 and 2011. The variable `Time` is the sum of the times from the different portions of the race, each of which begins with "K".
+
+### Aims
+
+- Practice inference on means
+
+## Problems
+
+  **1.** Read in the official Madison weather data.
+Treat the high temperatures on the dates from April 14 from the past twenty years (2003--2022) as a random sample from a population of potential maximum temperatures in Madison under recent climate conditions at this time of the year.
+Let $\mu$ and $\sigma$ represent the unknown mean and standard deviations of this population of high temperatures.
+
+- Calculate and display the summary statistics $n$, $\bar{x}$, and $s$, the sample standard deviation.
+
+```{r}
+weather =  read_csv("../../data/madison-weather-official-1869-2022.csv")
+
+weather2 = weather %>% 
+  filter(year(date) >= 2003,
+         month(date) == 4,
+         day(date) == 14)
+weatherstats =  weather2 %>%
+    summarize(n = n(),
+            mu = mean(tmax),
+            sd = sd(tmax))
+weatherstats
+
+```
+
+- Create a graph to display the distribution of this data.
+Choose which type of graph is effective for this purpose.
+
+```{r}
+ggplot(weather2, aes(x = tmax)) +
+  geom_density() +
+  geom_hline(yintercept = 0) +
+  xlab("max temps") +
+  ggtitle("temperature density graph") +
+  theme_minimal()
+```
+
+- Describe the distribution of daily maximum temperatures as shown by the graph. Is the distribution strongly skewed? Are there unusual measurements?
+
+> The distribution isn't strongly skewed, but it it still skewewd. It goes up, then drops down susbtantially.
+
+**2.** Compare the standard normal distribution with the t distribution with 19 degrees of freedom.
+  
+- Calculate the 0.975 quantiles from each of these two distribution.
+- On the same graph,
+display the density functions of these two distributions, using blue for normal and red for t.
+    - Add colored (use the same color scheme) dashed vertical lines at the corresponding 0.975 quantiles.
+    - Shade the area in tail areas below the 0.025 and above the 0.975 quantiles of each distribution, setting `alpha = 0.5` for partial transparency.
+    
+
+
+```{r}
+  x = weather2 %>%  pull(tmax)
+  B = 19
+sample = tibble(
+  xbar = map_dbl(1:B, ~{return( mean(sample(x, replace = TRUE)) )}))
+
+z = qnorm(0.975)
+distribution = mean(weather2$tmax)
+tdistribution = mean(sample$xbar)
+q1 = z*distribution
+q2 = z*tdistribution
+# 
+```
+```{r}
+ggplot()+
+    geom_norm_fill(q1, q2, b = 0.025)
+  # geom_norm_fill(q1, q2, a = 0.975)+
+  # geom_norm_density(mean(q1))+
+  # geom_norm_density(mean(q2), color = "red")
+```
+
+
+**3.** Using the data from Problem 1:
+
+- Construct a 95% confidence interval for $\mu$ using the theory of the t distribution by direct calculation using the summary statistics from the first part of the problem.
+
+```{r}
+
+ci = mean(weather2$tmax) + c(-1,1)*z*sd(sample$xbar)
+round(ci,3)
+
+```
+
+- Then use the `t.test()` function to verify your calculation.
+
+```{r}
+t.test(sample$xbar)
+```
+
+- Interpret the interval in context.
+
+> we are 95% confident that the highest temperatures will be between 56 degrees and 59 degrees.
+
+
+
+**4.** The historical average daily high temperature in Madison in April prior to 2000 is 55.6 degrees Farhenheit.
+Let $\mu$ be the expected daily high temperature on April 14 in the past two recent decades.
+
+- Use a hypothesis test to test if $\mu$ equals 55.6 degrees versus the alternative that it is different.
+Include all steps as in the lecture notes.
+
+```{r}
+mu2 = weather2$tmax
+
+hypothesis = t.test(mu2, mu = 55.6, alternative = "greater")
+hypothesis
+
+```
+
+- Conclude your hypothesis test with an interpretation in context which states your conclusion in plain language without technical jargon and summarizes the statistical evidence to support your conclusion in a statement surrounded by parentheses.
+
+> (based on the statistical evidence, we conclude that there is evidence that supports the alternative hypothesis that the true mean is greather than 55.6. We reject the null hypothesis.)
+
+
+
+
+**5.** This problem asks you to compare the latest date in each winter when there was at least one inch of snow for two different time periods using the official Madison weather data. and the years 1903--1922:
+  
+- Create a data set with the latest date from January to June in each year where there was at least one inch of snow for the years 1903--1922 and 2003--2022.
+- Use the **lubridate** function `yday()` to create a new variable `yday` by converting this date into the number of days after December 31.
+- Add a variable named `period` which has the value `"early 1900s"` for years 1903--1922 and `"early 2000s"` for the years 2003--2022.
+
+```{r}
+snow = weather %>% 
+  filter(month(date) <= 6,
+          year(date) >= 1903 & year(date) <= 1922 | year(date) >= 2003 & year(date) <= 2022,
+         snow_depth >= 1) %>% 
+  mutate(yday = yday(date),
+         period = case_when(year(date) >= 1903 & year(date) <= 1922 ~ "early 1900s",
+                            year(date) >= 2003 & year(date) <= 2022 ~ "early 2000s")) %>% 
+  arrange(date)
+snow
+```
+
+- Calculate the sample size, the sample mean, and the sample standard deviation for each period.
+
+```{r}
+n = length(snow$yday[1:915])
+samplemean = mean(snow$yday[1:915])
+samplesd = sd(snow$yday[1:915])
+
+n2= length(snow$yday[916:2098])
+samplemean2 = mean(snow$yday[916:2098])
+samplesd2 = sd(snow$yday[916:2098])
+
+n
+samplemean
+samplesd
+n2
+samplemean2
+samplesd2
+```
+
+- Create a graph to compare these two distributions.
+
+```{r}
+# ggplot()+geom_norm_density(samplemean)+geom_norm_density(samplemean2, color= "red")
+snow %>%
+  filter(period == "early 1900s") %>%
+  ggplot(aes(y = yday))+
+  geom_boxplot()
+  
+snow %>% 
+  filter(period == "early 2000s") %>%
+  ggplot(aes(y = yday))+
+  geom_boxplot()
+```
+
+
+
+**6.** Using the data from the previous problem:
+  
+- Use `t.test()` to construct a confidence interval for the difference in the mean last day of at least one inch of snow between these two time periods.
+    - Interpret the confidence interval in context.
+    
+```{r}
+t.test(snow$snow_depth[1:915])
+t.test(snow$snow_depth[916:2098])
+```
+> We are 95% confident that in the 1900s, the last day snow would have a depth between 5.58 inches and 6.21 inches.
+> We are 95% confident that in the 2000s, the last day snow would have a depth between 4.89 inches and 5.28 inches.
+    
+- Use `t.test()` to test the hypothesis that the population mean last days of at least one inch of snow are identical in the two time periods versus the alternative that they are different.
+   - Interpret the hypothesis test in context
+   
+```{r}
+t.test(c(5.58, 6.21))
+t.test(c(4.89, 5.26))
+```
+> We are 95% confident that the depth of snow would be 5.9 inches during 1900s
+
+> we are 95% confident that the depth of snow would be 5.075 inches during 2000s
+
+**7.** Using the Boston Marathon data, treat the finishing times of men aged 35--39 in 2010 as a sample from a larger population of men worldwide who could have completed the Boston marathon that year.
+
+- Calculate a numerical summary of the times to finish the race from this sample,
+including the sample size, sample mean, sample standard deviation,
+and the 0.10, 0.25, 0.50, 0.75, and 0.90 quantiles.
+
+```{r}
+marathon = read_csv("../../data/boston-marathon-data.csv")
+men = marathon %>% 
+  filter(Age_Range == "35-39",
+         Year == 2010,
+         Sex == "male")
+```
+```{r}
+samplesize = length(men$Time)
+
+samplemean.1 = mean(men$Time * qnorm(0.1))
+samplesd.1 = sd(men$Time * qnorm(0.1))
+
+samplemean.25=mean(men$Time * qnorm(0.25))
+samplesd.25=sd(men$Time * qnorm(0.25))
+
+samplemean.5=mean(men$Time * qnorm(0.5))
+samplesd.5=sd(men$Time * qnorm(0.5))
+
+samplemean.75=mean(men$Time * qnorm(0.75))
+samplesd.75=sd(men$Time * qnorm(0.75))
+
+samplemean.9=mean(men$Time * qnorm(0.9))
+samplesd.9=sd(men$Time * qnorm(0.9))
+samples = tibble(mean = c(samplemean.1, samplemean.25, samplemean.5, samplemean.75, samplemean.9),
+                 sd = c(samplesd.1, samplesd.25, samplesd.5, samplesd.75, samplesd.9))
+```
+
+- Choose a type of graph and display the distribution of the sample finish times.
+
+```{r}
+ggplot(samples, aes(x = mean))+
+  geom_density(fill = "yellow")
+
+ggplot(samples, aes(x = sd))+
+  geom_density(fill = "papayawhip")
+```
+
+- Find a 95% confidence interval for the mean finishing time in the population using methods of the t distribution by direct calculation
+
+```{r}
+mu=mean(men$Time)
+sample2 = tibble(
+  xbar = map_dbl(1:2000, ~{return( mean(sample(men$Time, replace = TRUE)) )}))
+sigma = sd(men$Time)
+n = length(men$Time)
+```
+```{r}
+Z = (mean(sample2$xbar) - mu)/(sigma/sqrt(n))
+Z
+```
+> Signifigant with 0.01 level of confidence
+
+- Repeat the calculations using the `t.test()` function
+
+
+```{r}
+t.test(men$Time)
+t.test(sample2$xbar)
+```
+
+- Interpret this confidence interval in context following the format of examples from lecture.
+
+> For regular distribution: We are 95% confident that most males will finish the race between 212 minutes and 215 minutes
+
+> For T distribution: We are 95% confident that most males will finish the race between 213 minutes and 214 minutes
+
+**8.** Treat the finishing times in the Boston Marathon of men aged 35--39 in 2010 and 2011 as two different independent samples. Is there evidence that the mean time to finish the race among a population of potential finishers changed during these two years? Conduct a hypothesis test to support your conclusion.
+
+> H0: T2011 < T2010
+  Ha: T2011 > T2010
+  
+```{r}
+men2 = marathon %>% 
+  filter(Age_Range == "35-39",
+         Year == 2011,
+         Sex == "male")
+```
+```{r}
+test = mean(men2$Time)/(sd(men2$Time)/sqrt(length(men2$Time)))
+test
+pval = 2*pt(-abs(test), 10)
+pval
+pt(abs(test), 10) - pt(-abs(test), 10)
+```
+```{r}
+test2 = mean(men$Time)/(sd(men$Time)/sqrt(length(men$Time)))
+test2
+pval2 = 2*pt(-abs(test2), 10)
+pval2
+pt(abs(test2), 10) - pt(-abs(test2), 10)
+```
+
+> The evidence shows that the null hypothesis is FALSE. The data above shows that the test statistic of 2011 finishing times is larger than 2010 finishing times, meaning the null hypothesis is failed. However, it proves that the alternative hypothesis is correct, showing 2010 finishing times is smaller than 2011 finishing times.

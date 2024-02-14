@@ -1,0 +1,294 @@
+---
+author: "Leo XIONG"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE, error = TRUE, fig.height = 3)
+library(tidyverse)
+library(kableExtra)
+source("../../scripts/viridis.R")
+source("../../scripts/ggprob.R")
+```
+
+\newcommand{\E}{\mathsf{E}}
+\newcommand{\Var}{\mathsf{Var}}
+\renewcommand{\prob}{\mathsf{P}}
+
+
+## Assignment 7
+
+#### Due Sunday, April 2, 11:59 PM CT
+
+### Preliminaries
+
+- Directories
+    - COURSE/homework/
+    - COURSE/homework/hw07/
+    - COURSE/data/
+    - COURSE/scripts/
+- Files
+  - COURSE/homework/hw07/hw07.Rmd
+  - COURSE/scripts/viridis.R
+  - COURSE/scripts/ggprob.R
+
+### Aims
+
+- Practice probability and the binomial distribution
+
+### Problems
+
+  1. A discrete random variable $X$ has possible values 0, 1, 2, 3, 4, 5, 6, 7, 8 with the following partial probability distribution.
+The missing probabilities $\prob(X=7)$ and $\prob(X=8)$ are equal to each other.
+
+```{r, echo = FALSE}
+set.seed(20221021)
+x = 0:8
+p = rnorm(7,5,2.1)
+p = sort(round(p / sum(p) * 0.84, 2))
+p1 = tibble(x = x, p = c(p, rep(NA,2)))
+
+p1_tab = p1 %>% 
+  mutate(x = str_c(x)) %>% 
+  pivot_wider(names_from = x, values_from = p) %>% 
+  mutate(x = "P(X=x)", .before = `0`) 
+
+p1_tab %>% 
+  kable() %>% 
+  kable_styling(position = "center", full_width = FALSE)
+```
+
+- Put the values `x = 0:8` and the tabled probabilities `p` into a data frame (use `tibble()`).
+
+```{r}
+dataframe = tibble(x = c(0:8),
+                   p = c(0.04, 0.06, 0.11, 0.12, 0.14, 0.17, 0.2, NA, NA))
+```
+
+- Write code to calculate the missing values for $\prob(X=7) = \prob(X = 8)$ and replace the missing values with these calculated values into your data frame.
+
+```{r}
+prob7 = (1-sum(dataframe$p[0:7]))/2
+prob8 = prob7
+prob7
+prob8
+dataframe$p[which(is.na(dataframe$p))] <- prob7
+dataframe
+
+```
+
+- Verify that the sum of all probabilities is 1.
+
+```{r}
+sum(dataframe$p)
+```
+
+- Calculate the mean, variance, and standard deviation of this distribution.
+
+```{r}
+meandataframe = sum(dataframe$x)*sum(dataframe$p)
+stddevdataframe = sqrt(meandataframe*(1-sum(dataframe$p)))
+variancedataframe = stddevdataframe*stddevdataframe
+meandataframe
+stddevdataframe
+variancedataframe
+```
+
+
+
+
+
+
+  2. Suppose you have a random variable $X \sim \text{Binomial}(120, 0.2)$.
+
+- 2a. Calculate and report the mean and standard deviation of the distribution.
+
+```{r}
+mean = 120*.2
+stddev = sqrt(mean*(1-.2))
+mean
+stddev
+```
+
+- 2b. Calculate and report the probability that the random variable is exactly equal to 20, $\prob(X = 20)$.
+
+```{r}
+probability = dbinom(100*.2, 100, .2)
+probability
+```
+
+- 2c. Calculate and report the probability that $X$ equals 20 or more, $\prob(X \ge 20)$.
+
+```{r}
+probability2 = dbinom(20, 120, 0.2)
+probability2
+
+```
+
+- 2d. Draw a graph of the binomial distribution with vertical lines at the mean (red and dashed), and 1, 2, and 3 standard deviations above and below the mean (red and dotted).
+
+
+```{r}
+gbinom(120, 0.2)+
+  geom_vline(xintercept = mean, color = "red", linetype = "dashed")+
+  geom_vline(xintercept = stddev, color = "red", linetype = "dotted")+
+  geom_vline(xintercept = probability, color = "red", linetype = "dotted")+
+  geom_vline(xintercept = probability2, color = "red", linetype = "dotted")
+  
+```
+
+
+
+
+
+  3. What is the probability that $X$ from Problem 2 is within one, two, and three standard deviations of the mean? Round each probability to four decimal places.
+
+```{r}
+stddev1mean=mean-stddev
+stddev2mean=mean-probability
+stddev3mean=mean-probability2
+round(stddev1mean,digit = 4)
+round(stddev2mean,digit = 4)
+round(stddev3mean,digit = 4)
+```
+
+
+
+
+
+
+  4. The following code makes a graph of the cumulative distribution function for the $\text{Binomial}(7, 0.3)$ distribution, that is $F(x) = \prob(X \le x)$. This is the function which is calculated by the base R function `pbinom()`.
+
+- Modify the code to add a horizontal red dotted line at 0.4.
+
+
+```{r}
+prob4 = tibble(
+  x = seq(-1,8,1),
+  p = dbinom(x, 7, 0.3),
+  cdf = pbinom(x, 7, 0.3))
+
+ggplot(prob4, aes(x = x, y = cdf )) +
+  geom_step(color = "blue") +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous(breaks = 0:7) +
+  geom_hline(slope = 0, yintercept = 0.4, color = "red", linetype = "dotted")+
+  xlab("x") +
+  ylab("Probability") +
+  ggtitle("Binomial(7, 0.3) distribution CDF") +
+  theme_minimal()
+```
+
+- Calculate the 0.4 quantile of the $\text{Binomial}(7, 0.3)$
+
+```{r}
+quantile0.4 = qbinom(0.4, 7, 0.3)
+quantile0.4
+```
+
+- Explain how the value of the quantile is related to the red dotted line which you added to the plot.
+
+> the quantile of 0.4 equal to 2, and 2 is the line where it intersects with the red dotted line
+
+- Use the graph to determine the 0.75 quantile of this distribution.
+Then verify your observation with a calculation.
+
+```{r}
+ggplot(prob4, aes(x = x, y = cdf )) +
+  geom_step(color = "blue") +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous(breaks = 0:7) +
+  geom_hline(slope = 0, yintercept = 0.75, color = "red", linetype = "dotted")+
+  xlab("x") +
+  ylab("Probability") +
+  ggtitle("Binomial(7, 0.3) distribution CDF") +
+  theme_minimal()
+
+qunatile0.75 = qbinom(0.75, 7, 0.3)
+qunatile0.75
+```
+
+
+
+
+
+  5. In a large population of likely voters, the proportion of voters who plan to vote for candidate A is $p = 0.52$. In a random sample of 600 likely voters, what is the probability that the proportion of voters who plan to vote for candidate A is less than 50% (the number of such voters is less than 300)?
+  
+```{r}
+nvote = 600
+pvote = 0.52
+votesample = rbinom(nvote, nvote, pvote )
+
+total = sum(votesample < 300)
+
+voterprob = total/nvote
+voterprob
+```
+
+
+
+
+  6. Basketball player 1 makes 80% of their free throws and basketball players 2 makes 70% of their free throws. Assume all of their free throws attempts are independent. If each player takes ten free throws and $X$ is the total number of free throws they make, does $X$ have a binomial distribution? If yes, specify the parameters $n$ and $p$. If not, explain why not.
+  
+> For BP1 and BP2, "n" is the same for both of them. For BP1, p is 0.8, and mu is 8. For BP2, p is 0.7 and mu is 7.
+
+
+
+
+  7. What is the smallest number of coin tosses $n$ of a fair coin so that the chance of getting 50 or more heads exceeds 90%?  (You may need to do some trial and error. Alternatively, think of creating a data frame with a column `n` and a column for the probability and using this to find the answer.)
+
+```{r}
+
+cointoss = 1-pbinom(49, 113, 0.5)
+cointoss
+```
+
+
+
+
+  8. The random variable $X$ has the $\text{Binomial}(100, 0.2)$ distribution.
+  
+- Find an integer $a$ so that $P(X \le a) \ge 0.5$ and $P(X \ge a) \ge 0.5$.
+- Show the values of $a$, $P(X \le a)$, and $P(X \ge a)$.
+
+```{r}
+# binomial(n=100, p = 0.2) and where it is <0.5 and >0.5
+# a=0.5
+# n10 = 100
+# p10 = 0.2
+# a_val1 = function(a){
+#   b = qnorm(a, n10, p10)
+#   c = pnorm(b, n10, p10)
+#   return(c)
+# }
+# a_val2 = function(a){
+#   b = qnorm(a, n10, p10)
+#   c = pnorm(b, n10, p10)
+#   return(c)
+# }
+# 
+# a_val1(a)
+# a_val2(a)
+a=0.5
+n10 = 100*.2
+p10 = sqrt(100*.2*(1-.2))
+a_val1 = function(a){
+  b = qnorm(a, n10, p10)
+  c = pnorm(b, n10, p10)
+  return(c)
+}
+a_val2 = function(a){
+  b = qnorm(a, n10, p10)
+  c = pnorm(b, n10, p10)
+  return(c)
+}
+
+a_val1(a)
+a_val2(a)
+```
+
+
+  
+
+
