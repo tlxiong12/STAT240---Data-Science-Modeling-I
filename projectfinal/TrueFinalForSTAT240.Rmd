@@ -1,0 +1,327 @@
+---
+title: "STAT 240 Final Project: Electric Vehicles, Prices, and Electric Range"
+output: html_document
+---
+Names: Leo, Naomi, Khaled, Hamidreza
+
+
+
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE,  message=FALSE, warning=FALSE,
+                      error = TRUE,
+                      fig.height = 4)
+library(tidyverse)
+library(lubridate)
+library(viridisLite)
+library(kableExtra)
+library(broman)
+library(readxl)
+library(scales)
+library(modelr)
+source("../../scripts/ggprob.R")
+source("../..//scripts/viridis.R")
+```
+
+
+
+
+
+```{r, echo=FALSE}
+elec_car = read_csv("../../data/Electric_Vehicle_Population_Data.csv")
+elec_car = elec_car %>% 
+  rename(zip = "Postal Code",
+         MSRP = "Base MSRP",
+         Year = "Model Year",
+         VIN = "VIN (1-10)",
+         Range = "Electric Range",
+         EVT = "Electric Vehicle Type")
+```
+### Introduction
+
+Electric vehicles have been a rising trend in transport, and since 2010, they have been increasing in popularity and demand. Electric vehicles provide many benefits to our planet earth. Electric vehicles help reduce the amount of carbon emissions produced by humans, help with cost savings, and provide technological innovations. Many car companies are developing electrical vehicles due to competition and money. We want to figure out which type of vehicle is the best for its price and range. With the rise of electric vehicles, the question on value begins to rise and the difference in price and range compared amongst themselves. BEVs tend to have larger batteries as they do not have to house any gasoline powered components unlike hybrid vehicles. Because of this, BEVs will have a better price to range ratio compared to the PHEVs. 
+The question we want to address is:
+**What is the relationship between MSRP, and Electric Range per Full Electric Vehicles and Hybrid Vehicles?**
+
+### Background
+
+The dataset we used for this project was made in April 16th of 2019, and contains 121978 observations, with each row being an individual vehicle registered in the state of Washington, with 17 variables being:
+
+
+- Vehicle VIN number 
+- County
+- City
+- State
+- Zip Code
+- Vehicle Year
+- Company
+- Model
+- Vehicle Type, which is either: 
+  - Battery Electric Vehicle (BEV or Fully Electric Vehicles)
+  - Plug-in Hybrid Electric Vehicle (PHEV or Hybrid Vehicles)
+- Clean alternative fuel vehicle (CAFV) 
+  - Eligibility which is the ability of the vehicle to run on alternative fuels
+- Range (Miles)
+- The distance the vehicle can travel in one charge
+- MSRP
+- Manufacturer's suggested retail price
+- Legislative district
+- Vehicle ID
+- Vehicle Location
+- Utility
+- Census tract
+
+
+Some background info is that the data focuses on the two types of electric vehicles:
+
+- **BEV**s are fully electric vehicles that are powered by a lithium ion battery, and has an electric motor instead of an engine, use less fluids than a normal car and doesn’t produce any emissions, which make them environmentally friendly.
+
+- **PHEV**s are semi-electric vehicles that has a battery to power an electric motor, and an engine that utilizes gasoline, allowing it to have the benefits of an electric vehicle, and a regular vehicle.
+
+According to the Washington State Department Of Transportation, they use a vehicular traffic data monitoring program to collect and maintain the data.
+
+
+### Sources
+
+- Washington State Department of Transportation. (n.d.). Transportation data. https://wsdot.wa.gov/about/transportation-data
+- U.S. Department of Energy. (Apr. 22, 2023). Electric vehicle population data. Data.gov., https://catalog.data.gov/dataset/electric-vehicle-population-data
+
+
+**Any unusual factors**
+
+The dataset lacks MSRP information for some electric vehicles, which results in insufficient data and accuracy for our analysis. This gives us missing years, missing range, missing models, etc. Moreover, if there is only one entry for a particular type of vehicle, it becomes challenging to determine its appropriateness without any comparison. The electric range, and MSRP exhibits significant variation, even among electric vehicle models of the same make. 
+
+**Some focus**
+
+We intend to find the relationship between MSRP and range for the different vehicle types, being BEVs and PHEVs. We intend to find if there's a correlation between these two variables and which is a better choice to purchase between a BEV or a PHEV. The key variables we will focus on are:
+
+- Year
+- Brand
+- Model
+- Vehicle Type
+- Range
+- MSRP
+
+
+
+### Analysis
+
+```{r, echo=FALSE}
+elec_car2 = elec_car %>% 
+	select(County, City, State, Year, Make, Model, EVT, Range, MSRP) %>% 
+	filter(MSRP !=0)
+```
+
+
+
+
+#### Pricing and Range
+To start our research, we want to find the average prices and electric ranges of EVs for each company. These graphs will represent the price and range.
+
+
+```{r, echo=FALSE}
+elec_car2 %>% 
+  group_by(Make) %>% 
+  summarize(avgprice = mean(MSRP)) %>% 
+  ggplot(aes(reorder(Make, avgprice), y = avgprice, fill = Make))+
+  geom_col()+xlab("Brand")+ylab("Average MSRP ($)")+ggtitle("Brand vs MSRP($)")
+```
+
+- Based on the presented diagram, it is evident that there is a significant difference in the average Manufacturer's Suggested Retail Price (MSRP) across various car brands. **Porsche** stands out as the brand with the highest average MSRP, with a value that is close to $150k. On the other hand, there are several brands, such as Kia, Mini, Chrysler, Subaru, and Wheego, that have relatively low and similar average MSRP values.
+
+
+```{r, echo=FALSE}
+elec_car2 %>% 
+  group_by(Make) %>% 
+  summarize(avgrange = mean(Range)) %>% 
+  ggplot(aes(reorder(Make, avgrange), y = avgrange, fill = Make))+
+  geom_col()+xlab("Brand")+ylab("Average Electric Range (Miles)")+ggtitle("Brand vs Electric Range(Miles)")
+```
+
+
+- The presented diagram shows the average electric range, which can be considered as an indicator of the battery endurance, across various car brands. The data highlights that **Tesla** is the most distinctive brand in terms of electric range, with an average value exceeding 200 Miles. Kia and Wheego also stand out with electric ranges that are very close to 100 Miles. 
+
+
+> We can compare the price and the electric range by putting those two graphs into one.
+
+
+```{r, echo=FALSE}
+elec_car2 %>% 
+  group_by(Make) %>% 
+  summarize(avgprice = mean(MSRP),
+            avgrange = mean(Range)) %>%
+  mutate(avgprice = avgprice * 0.001) %>%
+  pivot_longer(cols = starts_with("avg"),
+              names_to = "avg_type",
+              values_to = "n") %>%
+  ggplot(aes(x = reorder(Make, n), y = n, fill = avg_type))+
+  geom_col(position = position_dodge2(preserve = "single"))+
+  xlab("Brand") +
+  ylab("Average Price (k$) and Average Electric Range(Miles")
+```
+
+
+
+
+The dataset contains information on 11 different car companies. Tesla, which holds the highest electric range, appears to be a distinctive exception to the trend displayed as it has the highest average electric range despite not having the highest average price. On the contrary, Porsche, the most expensive brand, does not perform as well as Tesla. Its electric range only ranks around 9 out of 11.
+
+
+
+
+#### Full EVs and hybrid EVs
+> Now, digging deeper, is there a different performance between full EVs and hybrid EVs? Let's take a look. But, before we do, let's separate the two vehicle types and compare pricing and the electric range.
+
+```{r, echo=FALSE}
+BEV = elec_car2 %>%
+	filter(EVT == "Battery Electric Vehicle (BEV)") 
+
+
+BEV %>%
+  ggplot(aes(x = MSRP/1000, y = Range)) +
+  geom_point() +
+  geom_abline(slope = 2.3, alpha = 0.5, linetype = "dashed") +
+  labs(title = "MSRP vs Electric Range", subtitle = "Full electric vehicles") + 
+  xlab("MSRP (k$)") +
+  ylab("Electric Range (Miles)")
+```
+
+> Also, we consider the relation between Range as a response variable and MSRP as an explanatory variable for each battery electric vehicle (BEV) and plug-in hybrid electric vehicle(PHEV)separately by getting the regression coefficient and calculation of 95% confidence interval. 
+
+```{r, echo=FALSE}
+BEV = elec_car2 %>%
+	filter(EVT == "Battery Electric Vehicle (BEV)") 
+
+BEV %>%
+  ggplot(aes(x = MSRP/1000, y = Range)) +
+  geom_point() +
+  geom_smooth(se = FALSE, method = "lm") +
+  labs(title = "MSRP vs Electric Range", subtitle = "Battery Electric Vehicles(BEV)") + 
+  xlab("MSRP (k$)") +
+  ylab("Electric Range (Miles)")
+```
+
+```{r, echo=FALSE}
+BEV = elec_car2 %>%
+	filter(EVT == "Battery Electric Vehicle (BEV)") 
+  BEV_lm = lm(Range ~ MSRP, data = BEV)
+cf = coef(BEV_lm)
+cf
+summary(BEV_lm)
+
+```
+
+
+- From the diagram, it is evident that there is a positive correlation between the Manufacturer's Suggested Retail Price (MSRP) and the electric range of Battery Electric Vehicles(BEV) with the slope = 0.0027 and intercept = 16.39 . As the MSRP increases, the electric range also tends to increase, indicating that higher-priced electric vehicles generally have better battery endurance.The regression coefficient for MSRP is 0.0027, which means that for every $1,000 increase in the MSRP of a battery electric vehicle (BEV), the electric range increases by 2.7
+
+```{r, echo=FALSE}
+confint(BEV_lm, "MSRP", level = 0.95)
+
+```
+
+-The 95% confidence interval for the MSRP coefficient is (0.0027, 0.0028), which means that we are 95% confident that the true coefficient for battery electric vehicles (BEVs) falls within this interval.This interval tells us that the coefficient is statistically significant, as the interval does not include zero. In other words, we can reject the null hypothesis that there is no relationship between MSRP and electric range for BEVs, as there is evidence to suggest that there is a positive relationship.
+Furthermore, since the interval is entirely positive, we can conclude that the relationship is positive, meaning that as the MSRP of a BEV increases, the electric range also increases. 
+
+
+```{r, echo=FALSE}
+PHEV = elec_car2 %>%
+	filter(EVT == "Plug-in Hybrid Electric Vehicle (PHEV)") 
+
+PHEV %>%
+  ggplot(aes(x = MSRP/1000, y = Range)) +
+  geom_point() +
+  geom_smooth(se = FALSE, method = "lm") +
+  labs(title = "MSRP vs Electric Range", subtitle = "Plug-in Hybrid Electric Vehicle (PHEV)") + 
+  xlab("MSRP (k$)") +
+  ylab("Electric Range (Wh)")
+```
+
+```{r, echo=FALSE}
+PHEV = elec_car2 %>%
+	filter(EVT == "Plug-in Hybrid Electric Vehicle (PHEV)") 
+  PHEV_lm = lm(Range ~ MSRP, data = PHEV)
+cf = coef(PHEV_lm)
+cf
+summary(PHEV_lm)
+```
+
+- According to this diagram, there is a weak negative correlation between the Manufacturer's Suggested Retail Price (MSRP) and the electric range of electric vehicles with the slope = -0.0000056 and intercept = 17.82. As the MSRP increases, the electric range tends to decrease slightly, indicating that some higher-priced electric vehicles may not necessarily offer better battery endurance than their lower-priced counterparts.The regression coefficient for MSRP is -5.562, which means that for every $1,000 increase in the MSRP of a battery electric vehicle (BEV), the electric range decrease by 5562. 
+
+```{r, echo=FALSE}
+confint(PHEV_lm, "MSRP", level = 0.95)
+
+```
+
+-The 95% confidence interval for the coefficient of the MSRP variable in the linear model for PHEVs is (-0.00002, 0.000008).
+This range includes both positive and negative values, which means that we cannot be sure whether the true coefficient is positive or negative.
+Furthermore, the confidence interval includes zero, which means that the relationship between MSRP and electric range for PHEVs is not statistically significant. We cannot reject the null hypothesis that there is no relationship between MSRP and electric range for PHEVs, as the evidence is inconclusive.
+
+
+- To further investigate this relationship, we can eliminate the electric vehicles with an MSRP greater than 800 and focus only on those with an MSRP of less than 100k. Limiting our analysis to this allows us to observe whether the negative correlation between MSRP and electric range becomes more pronounced. This examination can help us identify any potential patterns or trends in the data that may not have been apparent before.
+
+
+
+
+```{r, echo=FALSE}
+PHEV %>%
+  filter(MSRP < 100000) %>%
+  ggplot(aes(x = MSRP/1000, y = Range)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "MSRP vs Electric Range", subtitle = "Hybrid electric vehicles") + 
+  xlab("MSRP (k$)") +
+  ylab("Electric Range (Wh)")
+```
+
+- Upon a new examination of the provided data, it is now clear that a negative correlation exists between the Manufacturer's Suggested Retail Price and the electric range of hybrid electric vehicles. As the MSRP increases, the electric range tends to decrease, indicating that consumers may need to pay a premium price for hybrid vehicles that offer better battery endurance.
+
+### Analysis Conclusion:
+
+We can see that the coefficient of plug-in hybrid electric vehicles(PHEV)is smaller than that for battery electric vehicles (BEVs), which indicates that the relationship between MSRP and electric range is weaker for PHEVs than for BEVs.
+Also, these findings suggest that the relationship between MSRP and electric range differs between battery electric vehicles (BEVs) and plug-in hybrid electric vehicles (PHEVs), with a stronger positive relationship for BEVs than for PHEVs.
+Therefore,This finding sheds light on the importance of understanding the trade-offs between cost and performance when considering purchasing a hybrid electric vehicle. While higher-priced hybrid vehicles may have more advanced technology and features, such as a more efficient hybrid system, they may not always offer better battery endurance compared to lower-priced alternatives.
+
+
+
+
+
+### Discussion
+
+With the sample data calculated above, we have a  good grasp and understanding  of what we want to determine. Price varies greatly depending on the brand, and Electric range is important for determining whether each vehicle is worth it for its price. Among the brands listed, Teslas have the highest average electric range while Porsches are the most expensive. It can be inferred that Tesla has an absolute advantage in the competition of MSRP due to its significantly higher electric range compared to other brands. There seems to be a trend where the average electric range tends to increase as the average price of a car brand increases, with Tesla being the exception as it has the highest average electric range despite not having the highest average price.
+
+For the first parts of the analysis, it is evident that Porsche stands out as the luxury car brand with the highest average Manufacturer's Suggested Retail Price (MSRP) while not performing well in the average electric range. This result can be attributed to the fact that people who purchase Porsche cars are not motivated by economic benefits but rather by other factors, such as displaying their wealth or achieving a certain social status.
+
+
+On the other hand, Tesla appears to be the best choice for consumers, with a lower MSRP and the highest average electric range. This outcome can be expected as Tesla is one of the first brands that started to develop electric vehicles, which has given it a significant advantage in terms of technology to provide higher electric range batteries or have less power consumption when driving. As a result, consumers can purchase a Tesla car at a lower price and use it for longer without worrying about battery endurance or high running costs.
+
+
+Overall, this analysis highlights the importance of considering both MSRP and electric range when making purchasing decisions for cars. While luxury brands such as Porsche may offer high-end features and luxury experiences, they may not necessarily provide the best value for money in terms of battery endurance and long-term cost savings. In contrast, brands such as Tesla prioritize technological innovation and sustainability can provide consumers with economical and environmental benefits.
+
+For the second part of the analysis, full electric vehicles seem to follow the same pattern that as the price increases, the electric range also increases. This finding can be explained by the fact that the battery is one of the most critical components in an electric vehicle and is responsible for the car's endurance and performance. Higher-priced electric vehicles can afford to use larger and more advanced batteries, which can provide better battery endurance and more extended driving ranges. In contrast, lower-priced electric vehicles may use smaller or less advanced batteries to keep costs down, resulting in shorter electric ranges.
+
+It is worth noting that this observation only applies to full electric vehicles, as hybrid electric vehicles (HEVs) and plug-in hybrid electric vehicles (PHEVs) typically have smaller batteries, which may not follow the same trend as full electric vehicles. Additionally, while the relationship between MSRP and electric range may hold for most electric vehicle brands, there may be exceptions where some brands may offer better value for money or use advanced technologies to provide higher electric ranges at lower prices.
+
+
+**Potential short-comings**
+
+Out of 120,000 plus vehicles that are in this dataset, there were only 3,467 usable vehicles/rows with data we needed. This makes our analysis and conclusion very inaccurate, as there were missing models, years, brands, MSRP, Electric Range and vehicle types. Our two key variables, “MSRP”, and “Electric Range” lacked much detail which lead to there only being 3,467 vehicles for us to make our analysis on. These two were the most essential, as our question of interest revolved around them. 
+
+```{r, echo = FALSE}
+elec_car %>%
+	filter(MSRP == 0)
+```
+
+> This dataframe shows all of the vehicles that contain missing MSRP data.
+
+**Potential future directions**
+
+If the data was complete, we would attempt to estimate future prices of electric vehicles, and their ranges. We would answer this question by using a hypothesis test, and/or linear regression in order to estimate the average future prices of electric vehicles, and their electric range. To go even further, we could also estimate future prices and ranges of each individual brand if necessary.
+
+**Conclusion**
+
+In conclusion, we can see that Tesla seems to outperform the other brands when it comes to the relationship between MSRP and Range, having the highest range while not having the highest average price. This can be because Teslas are full electric vehicles. As seen above in our analysis, Fully electric cars tend to have a linear relationship, in terms of electric range and price. This means that the more you pay, the farther you can travel. Teslas overall are not as expensive as the other vehicles in the data set, making a Tesla vehicle a good choice for an electric car.
+
+
+
+### References
+^[https://catalog.data.gov/dataset/electric-vehicle-population-data]
+^[https://wsdot.wa.gov/about/transportation-data]
